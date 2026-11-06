@@ -1,5 +1,7 @@
 schema: intent-driven
 
+stack: javascript
+
 context: |
   Tech stack: TypeScript, React, Node.js
   We use conventional commits
