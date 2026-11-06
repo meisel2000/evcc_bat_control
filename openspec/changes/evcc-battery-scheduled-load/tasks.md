@@ -13,7 +13,7 @@
 ### 2.A Grid charge to target state of charge (scheduled-battery-grid-charge)
 
 - [x] 2.1 scheduled-battery-grid-charge: "Given the configured target state of charge is 90 percent" / "And the battery state of charge is 40 percent" / "When the scheduled run starts" / "Then the battery is set to charge mode" — red → green → commit
-- [ ] 2.2 scheduled-battery-grid-charge: "Then no battery mode change is sent" / "And the run exits successfully" (battery at or above target) — red → green → commit
+- [x] 2.2 scheduled-battery-grid-charge: "Then no battery mode change is sent" / "And the run exits successfully" (battery at or above target) — red → green → commit
 
 ### 2.B Keep-alive refresh of charge mode
 
