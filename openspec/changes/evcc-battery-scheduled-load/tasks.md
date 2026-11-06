@@ -33,7 +33,7 @@
 ### 2.E Startup recovery of own charge session
 
 - [x] 2.9 scheduled-battery-grid-charge: "Given the battery mode is charge" / "And the state marker shows that a previous run of this job started the charge" / "Then the battery is set to normal mode" — red → green → commit
-- [ ] 2.10 scheduled-battery-grid-charge: "And no state marker exists" / "Then no battery mode change is sent" — red → green → commit
+- [x] 2.10 scheduled-battery-grid-charge: "And no state marker exists" / "Then no battery mode change is sent" — red → green → commit
 
 ### 2.F Failure handling
 

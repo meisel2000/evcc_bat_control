@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { Given, When, Then } = require('@cucumber/cucumber');
-const { mkdtemp, writeFile } = require('node:fs/promises');
+const { mkdtemp, rm, writeFile } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { startApp } = require('../support/app.js');
@@ -312,6 +312,12 @@ const statePathFor = async (world) => {
 
 Given('the battery mode is charge', function () {
   this.evcc.setBatteryMode('charge');
+});
+
+// No state marker: a charge started by a user, not by this job, leaves none behind.
+Given('no state marker exists', async function () {
+  const statePath = await statePathFor(this);
+  await rm(statePath, { force: true });
 });
 
 Given('the state marker shows that a previous run of this job started the charge', async function () {
