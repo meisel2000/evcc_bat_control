@@ -54,6 +54,9 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
       client,
       clockOpts,
     );
+    if (result.outcome === "window-ended") {
+      console.log("info: tariff window ended at 06:00 before target was reached; battery set to normal mode");
+    }
     if (result.outcome === "max-duration-reached") {
       console.error(
         `error: charge did not reach target ${cfg.targetSoc}% within ${cfg.maxDurationMinutes} minutes`,

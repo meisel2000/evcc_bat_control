@@ -175,3 +175,34 @@ Then('the battery is set to normal mode', function () {
       `(app exit code ${this.run.exitCode}, stdout: ${this.run.stdout.trim()})`,
   );
 });
+
+// Tariff window ends at 06:00 local time. The app's process local time is UTC
+// (the harness sets TZ=UTC), so the virtual clock starts 30 minutes before it.
+const TARIFF_WINDOW_CLOCK_START = '2026-01-10T05:30:00Z';
+const TARIFF_WINDOW_EXIT_TIMEOUT_MS = 30 * 1000;
+
+When('the time reaches 06:00', function () {
+  this.tariffWindowClockStart = TARIFF_WINDOW_CLOCK_START;
+});
+
+When('the target state of charge has not been reached', { timeout: TARIFF_WINDOW_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
+  const { child, result } = await startApp(
+    this.evcc.url,
+    { targetSoc: this.targetSoc },
+    { env: { EVCC_TEST_CLOCK: this.tariffWindowClockStart, TZ: 'UTC' } },
+  );
+  const deadline = Date.now() + TARIFF_WINDOW_EXIT_TIMEOUT_MS;
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+    await sleep(50);
+  }
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGTERM');
+    this.run = await result;
+    assert.fail(
+      `expected app to stop at the end of the tariff window (06:00) within ` +
+        `${TARIFF_WINDOW_EXIT_TIMEOUT_MS / 1000} s, but it kept running ` +
+        `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+    );
+  }
+  this.run = await result;
+});

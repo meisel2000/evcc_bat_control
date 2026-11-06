@@ -23,7 +23,7 @@
 
 - [x] 2.4 scheduled-battery-grid-charge: "When the battery state of charge reaches the configured target" / "Then the battery is set to normal mode" / "And the run exits successfully" — red → green → commit
 - [x] 2.5 scheduled-battery-grid-charge: "And the maximum duration is 2 hours" / "When the charge has run for 2 hours without reaching the target" / "Then the run exits with an error" — red → green → commit
-- [ ] 2.6 scheduled-battery-grid-charge: "When the time reaches 06:00" / "And the target state of charge has not been reached" — red → green → commit
+- [x] 2.6 scheduled-battery-grid-charge: "When the time reaches 06:00" / "And the target state of charge has not been reached" — red → green → commit
 - [ ] 2.7 scheduled-battery-grid-charge: "And the configured no-progress timeout has passed without a rise in state of charge" / "Then the run exits with an error" — red → green → commit
 
 ### 2.D Restore normal mode on exit

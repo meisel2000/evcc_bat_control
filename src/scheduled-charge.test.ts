@@ -26,6 +26,9 @@ function fakeClient(...socs: number[]) {
 
 class StopLoop extends Error {}
 
+/** Fixed clock at 12:00 local time, so tests that do not concern time are independent of the wall clock. */
+const midday = () => new Date(2026, 0, 10, 12, 0, 0).getTime();
+
 /** Sleep stub that records requested delays and stops the loop after `count` sleeps. */
 function fakeSleep(count: number) {
   const delays: number[] = [];
@@ -39,14 +42,14 @@ function fakeSleep(count: number) {
 test("sets charge mode when battery soc is below target", async () => {
   const { client, calls } = fakeClient(40);
   const { sleep } = fakeSleep(0);
-  await assert.rejects(runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, { sleep }), StopLoop);
+  await assert.rejects(runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, { sleep, now: midday }), StopLoop);
   assert.deepEqual(calls, ["getState", "setChargeMode"]);
 });
 
 test("re-sends charge mode every 30 seconds while charging", async () => {
   const { client, calls } = fakeClient(40, 40);
   const { sleep, delays } = fakeSleep(2);
-  await assert.rejects(runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, { sleep }), StopLoop);
+  await assert.rejects(runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, { sleep, now: midday }), StopLoop);
   assert.deepEqual(calls, ["getState", "setChargeMode", "getState", "setChargeMode"]);
   assert.deepEqual(delays, [30_000, 30_000]);
 });
@@ -54,7 +57,7 @@ test("re-sends charge mode every 30 seconds while charging", async () => {
 test("sends normal mode and stops when battery soc reaches target while charging", async () => {
   const { client, calls } = fakeClient(40, 60, 90);
   const { sleep } = fakeSleep(10);
-  await runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, { sleep });
+  await runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, { sleep, now: midday });
   assert.deepEqual(calls, [
     "getState",
     "setChargeMode",
@@ -71,13 +74,32 @@ test("sends no mode change when battery soc is at target", async () => {
   assert.deepEqual(calls, ["getState"]);
 });
 
-test("stops at maximum duration, sets normal mode and reports failure", async () => {
+test("sets normal mode and reports window end when local time reaches 06:00", async () => {
   const { client, calls } = fakeClient(40);
-  let t = 0;
+  let t = new Date(2026, 0, 10, 5, 30, 0).getTime();
   const now = () => t;
   const sleep = async (ms: number) => {
     t += ms;
-    if (t > 10 * 3_600_000) throw new Error("runaway: loop did not stop");
+    if (t > new Date(2026, 0, 10, 7, 0, 0).getTime()) throw new Error("runaway: loop did not stop");
+  };
+  const result = await runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, {
+    sleep,
+    now,
+  });
+  assert.equal(result.outcome, "window-ended");
+  assert.equal(calls.at(-1), "setNormalMode");
+  assert.equal(calls.filter((c) => c === "setNormalMode").length, 1);
+  assert.equal(t, new Date(2026, 0, 10, 6, 0, 0).getTime());
+});
+
+test("stops at maximum duration, sets normal mode and reports failure", async () => {
+  const { client, calls } = fakeClient(40);
+  const start = midday();
+  let t = start;
+  const now = () => t;
+  const sleep = async (ms: number) => {
+    t += ms;
+    if (t - start > 10 * 3_600_000) throw new Error("runaway: loop did not stop");
   };
   const result = await runScheduledCharge({ targetSoc: 90, maxDurationMinutes: 120 }, client, {
     sleep,
@@ -86,5 +108,5 @@ test("stops at maximum duration, sets normal mode and reports failure", async ()
   assert.equal(result.outcome, "max-duration-reached");
   assert.equal(calls.at(-1), "setNormalMode");
   assert.equal(calls.filter((c) => c === "setNormalMode").length, 1);
-  assert.equal(t, 120 * 60_000);
+  assert.equal(t - start, 120 * 60_000);
 });
