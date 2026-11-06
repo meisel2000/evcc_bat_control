@@ -91,6 +91,11 @@ The job uses an `evcc_` API key from a Kubernetes Secret, mounted as an environm
 ### Decision: configuration in a ConfigMap file
 Target SoC, maximum duration (2 hours), no-progress timeout, HTTP timeouts, and the evcc URL live in a mounted config file. Changes take effect on the next run, since each run reads the file at start.
 
+### Decision: injectable clock for time-based stops
+The 2-hour maximum duration, the 06:00 window end, and the no-progress timeout depend on elapsed and wall-clock time. Acceptance scenarios cannot wait for these, so the job reads the current time through a clock seam. In production the seam is the system clock. The acceptance suite sets the environment variable `EVCC_TEST_CLOCK` to an ISO-8601 start time and the job advances that clock only through the test harness control. When the variable is unset, the system clock is used. The variable is documented as test-only and is not set in the CronJob manifest.
+- Alternative: time scaling in config. Rejected: a speed-up knob in production config.
+- Alternative: unit tests only for these stops. Rejected: loses the end-to-end process check.
+
 ### Decision: schedule owned by the CronJob manifest
 The months (November to February), daily start time within 00:00 to 06:00, and time zone are set in the CronJob manifest. `concurrencyPolicy: Forbid` prevents overlapping runs. `startingDeadlineSeconds` is set so a missed start is skipped rather than run late into the day.
 
