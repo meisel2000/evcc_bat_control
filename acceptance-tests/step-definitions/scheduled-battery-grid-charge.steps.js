@@ -399,7 +399,7 @@ const STARTUP_EXIT_TIMEOUT_MS = 30 * 1000;
 When('the job starts', { timeout: STARTUP_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
   this.evcc.setBatterySoc(92);
   const statePath = await statePathFor(this);
-  const { child, result } = await startApp(this.evcc.url, { targetSoc: 90 }, { statePath });
+  const { child, result } = await startApp(this.evcc.url, { targetSoc: this.targetSoc ?? 90 }, { statePath });
   const isRunning = () => child.exitCode === null && child.signalCode === null;
   const deadline = Date.now() + STARTUP_EXIT_TIMEOUT_MS;
   while (isRunning() && Date.now() < deadline) {
@@ -411,3 +411,39 @@ When('the job starts', { timeout: STARTUP_EXIT_TIMEOUT_MS + 15 * 1000 }, async f
   this.run = await result;
 });
 
+
+// Invalid configuration (spec: "Configuration validation"). The config file
+// carries an out-of-range target state of charge; the job must refuse to start
+// before contacting evcc.
+Given('the config file sets the target state of charge to 120 percent', function () {
+  this.targetSoc = 120;
+});
+
+Then('the job exits with a non-zero exit code before contacting evcc', function () {
+  assert.notEqual(
+    this.run.exitCode,
+    0,
+    `expected app to exit with a non-zero exit code, got ${this.run.exitCode} ` +
+      `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+  );
+  assert.equal(
+    this.evcc.requests.length,
+    0,
+    `expected no request to evcc, but ${this.evcc.requests.length} were sent ` +
+      `(${this.evcc.requests.map((r) => `${r.method} ${r.path}`).join(', ')})`,
+  );
+});
+
+Then('the error names the target state of charge', function () {
+  const output = `${this.run.stdout}\n${this.run.stderr}`;
+  assert.match(
+    output,
+    /target/i,
+    `expected error to name the target, got stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()}`,
+  );
+  assert.match(
+    output,
+    /state of charge/i,
+    `expected error to name the state of charge, got stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()}`,
+  );
+});

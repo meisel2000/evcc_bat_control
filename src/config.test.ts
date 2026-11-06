@@ -55,7 +55,8 @@ test("rejects a target SoC above 100 and names the target SoC", () => {
   assert.throws(
     () => loadConfig({ ...validFile, targetSoc: 120 }, env),
     (err: unknown) =>
-      err instanceof ConfigError && /targetSoc/.test(err.message),
+      err instanceof ConfigError &&
+      /target state of charge \(targetSoc\) must be between 0 and 100 \(got 120\)/.test(err.message),
   );
 });
 

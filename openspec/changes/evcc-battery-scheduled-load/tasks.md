@@ -42,7 +42,7 @@
 
 ### 2.G Configuration validation
 
-- [ ] 2.13 scheduled-battery-grid-charge: "Given the config file sets the target state of charge to 120 percent" / "Then the job exits with a non-zero exit code before contacting evcc" / "And the error names the target state of charge" — red → green → commit
+- [x] 2.13 scheduled-battery-grid-charge: "Given the config file sets the target state of charge to 120 percent" / "Then the job exits with a non-zero exit code before contacting evcc" / "And the error names the target state of charge" — red → green → commit
 
 ### 2.H API key authentication
 

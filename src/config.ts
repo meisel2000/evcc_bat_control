@@ -53,7 +53,7 @@ export function loadConfig(raw: unknown, env: Env = process.env): AppConfig {
 
   const targetSoc = file.targetSoc;
   if (typeof targetSoc !== "number" || !Number.isFinite(targetSoc) || targetSoc < 0 || targetSoc > 100) {
-    throw new ConfigError(`targetSoc must be between 0 and 100 (got ${JSON.stringify(targetSoc)})`);
+    throw new ConfigError(`target state of charge (targetSoc) must be between 0 and 100 (got ${JSON.stringify(targetSoc)})`);
   }
 
   const statePath = file.statePath;
