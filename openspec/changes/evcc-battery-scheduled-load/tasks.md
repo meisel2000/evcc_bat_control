@@ -63,6 +63,6 @@
 
 ## 3. Completion
 
-- [ ] 3.1 Run the full suite: every scenario passes, zero pending/undefined steps, HTML report generated
+- [x] 3.1 Run the full suite: every scenario passes, zero pending/undefined steps, HTML report generated
 - [ ] 3.2 Run `openspec validate evcc-battery-scheduled-load --type change --strict` before archive
 - [ ] 3.3 Execute the migration plan: dry-run once against live evcc and confirm logged mode changes match `/state`, then a low-target real charge in daytime to confirm `charge` and `normal` transitions
