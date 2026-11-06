@@ -34,6 +34,26 @@ test("getState reads battery soc and mode with the API key as bearer token", asy
   assert.equal(state.batteryMode, "normal");
 });
 
+test("setNormalMode posts normal mode with the API key as bearer token", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const client = createEvccClient({
+    baseUrl: "http://evcc.local:7070",
+    apiKey: "evcc_secret",
+    timeoutMs: 5000,
+    fetch: fakeFetch(calls),
+  });
+
+  await client.setNormalMode();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "http://evcc.local:7070/batterymode/normal");
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(
+    (calls[0].init.headers as Record<string, string>).Authorization,
+    "Bearer evcc_secret",
+  );
+});
+
 test("setChargeMode posts charge mode with the API key as bearer token", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const client = createEvccClient({

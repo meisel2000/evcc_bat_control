@@ -13,7 +13,8 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 /**
  * Starts a grid charge when the battery is below the target state of charge.
  * Makes no mode change when the target is already reached.
- * While charging, re-sends the charge mode every keep-alive interval.
+ * While charging, re-sends the charge mode every keep-alive interval and
+ * re-reads the state each cycle. Once the target is reached, sets normal mode and returns.
  */
 export async function runScheduledCharge(
   settings: { targetSoc: number },
@@ -30,6 +31,11 @@ export async function runScheduledCharge(
   await client.setChargeMode();
   for (;;) {
     await sleep(intervalMs);
+    const current = await client.getState();
+    if (current.batterySoc >= settings.targetSoc) {
+      await client.setNormalMode();
+      return;
+    }
     await client.setChargeMode();
   }
 }

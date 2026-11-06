@@ -6,6 +6,7 @@ export interface EvccState {
 export interface EvccClient {
   getState(): Promise<EvccState>;
   setChargeMode(): Promise<void>;
+  setNormalMode(): Promise<void>;
 }
 
 export interface EvccClientOptions {
@@ -44,6 +45,9 @@ export function createEvccClient(opts: EvccClientOptions): EvccClient {
     },
     async setChargeMode() {
       await request("POST", "/batterymode/charge");
+    },
+    async setNormalMode() {
+      await request("POST", "/batterymode/normal");
     },
   };
 }

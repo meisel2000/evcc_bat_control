@@ -94,3 +94,43 @@ Then('the run exits successfully', function () {
     `expected app exit code 0, got ${this.run.exitCode} (stderr: ${this.run.stderr.trim()})`,
   );
 });
+
+const TARGET_REACHED_EXIT_TIMEOUT_MS = 35 * 1000;
+
+When('the battery state of charge reaches the configured target', { timeout: TARGET_REACHED_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
+  const { child, result } = await startApp(this.evcc.url, { targetSoc: this.targetSoc });
+  const isRunning = () => child.exitCode === null && child.signalCode === null;
+  const chargeSent = () =>
+    this.evcc.requests.some((r) => r.method === 'POST' && r.path === '/batterymode/charge');
+  // Only raise the SoC once the app is charging, so the target is reached mid-charge.
+  const chargeDeadline = Date.now() + SCHEDULED_RUN_OBSERVE_MS;
+  while (isRunning() && !chargeSent() && Date.now() < chargeDeadline) {
+    await sleep(SCHEDULED_RUN_POLL_MS);
+  }
+  this.evcc.setBatterySoc(this.targetSoc);
+  const deadline = Date.now() + TARGET_REACHED_EXIT_TIMEOUT_MS;
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+    await sleep(50);
+  }
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGTERM');
+    this.run = await result;
+    assert.fail(
+      `expected app to exit after reaching target SoC ${this.targetSoc}% within ` +
+        `${TARGET_REACHED_EXIT_TIMEOUT_MS / 1000} s, but it kept running ` +
+        `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+    );
+  }
+  this.run = await result;
+});
+
+Then('the battery is set to normal mode', function () {
+  const normalRequests = this.evcc.requests.filter(
+    (r) => r.method === 'POST' && r.path === '/batterymode/normal',
+  );
+  assert.ok(
+    normalRequests.length > 0,
+    `expected a POST /batterymode/normal to evcc, but none was sent ` +
+      `(app exit code ${this.run.exitCode}, stdout: ${this.run.stdout.trim()})`,
+  );
+});
