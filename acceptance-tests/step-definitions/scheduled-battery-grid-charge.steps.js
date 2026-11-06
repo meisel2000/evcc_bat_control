@@ -206,3 +206,42 @@ When('the target state of charge has not been reached', { timeout: TARIFF_WINDOW
   }
   this.run = await result;
 });
+
+// No-progress timeout (default 30 minutes, see src/config.ts). The fake evcc
+// holds the battery SoC flat, so the job never observes a rise.
+const NO_PROGRESS_EXIT_TIMEOUT_MS = 30 * 1000;
+
+Given('the configured no-progress timeout has passed without a rise in state of charge', function () {
+  // Intent recorded: the flat SoC set by "the battery is charging from the grid"
+  // means no rise is ever observed. Ensure it stays flat.
+  this.noProgressExpected = true;
+  this.evcc.setBatterySoc(40);
+});
+
+When('the no-progress timeout is reached', { timeout: NO_PROGRESS_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
+  const { child, result } = await startApp(
+    this.evcc.url,
+    { targetSoc: this.targetSoc },
+    { env: { EVCC_TEST_CLOCK: TEST_CLOCK_START, TZ: 'UTC' } },
+  );
+  const deadline = Date.now() + NO_PROGRESS_EXIT_TIMEOUT_MS;
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+    await sleep(50);
+  }
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGTERM');
+    this.run = await result;
+    assert.fail(
+      `expected app to stop on no progress within ${NO_PROGRESS_EXIT_TIMEOUT_MS / 1000} s, ` +
+        `but it kept running (stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+    );
+  }
+  this.run = await result;
+  const output = `${this.run.stdout}\n${this.run.stderr}`;
+  assert.match(
+    output,
+    /no progress/i,
+    `expected app output to mention "no progress" (no-progress stop), ` +
+      `got stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()}`,
+  );
+});

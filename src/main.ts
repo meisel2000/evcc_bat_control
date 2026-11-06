@@ -50,12 +50,22 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
   }
   try {
     const result = await runScheduledCharge(
-      { targetSoc: cfg.targetSoc, maxDurationMinutes: cfg.maxDurationMinutes },
+      {
+        targetSoc: cfg.targetSoc,
+        maxDurationMinutes: cfg.maxDurationMinutes,
+        noProgressTimeoutMinutes: cfg.noProgressTimeoutMinutes,
+      },
       client,
       clockOpts,
     );
     if (result.outcome === "window-ended") {
       console.log("info: tariff window ended at 06:00 before target was reached; battery set to normal mode");
+    }
+    if (result.outcome === "no-progress") {
+      console.error(
+        `error: state of charge made no progress for ${cfg.noProgressTimeoutMinutes} minutes; battery set to normal mode`,
+      );
+      return 1;
     }
     if (result.outcome === "max-duration-reached") {
       console.error(
