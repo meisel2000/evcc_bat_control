@@ -5,7 +5,7 @@ metadata:
 data:
   config.json: |
     {
-      "evccUrl": "http://evcc.REPLACE-NAMESPACE.svc.cluster.local:7070",
+      "evccUrl": "http://k9s:30070/api",
       "targetSoc": 100,
       "maxDurationMinutes": 120,
       "noProgressTimeoutMinutes": 30,
