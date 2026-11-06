@@ -59,7 +59,7 @@
 
 ### 2.K Packaging and deployment (non-BDD, covered by manifest and image review)
 
-- [ ] 2.18 Add minimal non-root Node.js/TypeScript Dockerfile and Kubernetes manifests (PVC, ConfigMap, Secret reference, CronJob with `concurrencyPolicy: Forbid`, `startingDeadlineSeconds`, `terminationGracePeriodSeconds`, `suspend: true` initially) — commit with conventional commit message
+- [x] 2.18 Add minimal non-root Node.js/TypeScript Dockerfile and Kubernetes manifests (PVC, ConfigMap, Secret reference, CronJob with `concurrencyPolicy: Forbid`, `startingDeadlineSeconds`, `terminationGracePeriodSeconds`, `suspend: true` initially) — commit with conventional commit message
 
 ## 3. Completion
 

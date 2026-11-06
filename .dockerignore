@@ -1,0 +1,11 @@
+.git
+.agents
+.opencode
+acceptance-tests
+node_modules
+openspec
+reports
+adr
+deploy
+**/*.test.ts
+**/.DS_Store

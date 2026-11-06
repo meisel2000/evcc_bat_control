@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: evcc-grid-charge-config
+data:
+  config.json: |
+    {
+      "evccUrl": "http://evcc.REPLACE-NAMESPACE.svc.cluster.local:7070",
+      "targetSoc": 100,
+      "maxDurationMinutes": 120,
+      "noProgressTimeoutMinutes": 30,
+      "httpTimeoutMs": 5000,
+      "dryRun": false,
+      "statePath": "/state/state.json"
+    }

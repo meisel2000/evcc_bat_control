@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: evcc-grid-charge
+spec:
+  # Nov-Feb, daily start between 00:00 and 06:00 local time.
+  schedule: "0 2 * 1,2,11,12 *"
+  timeZone: "Europe/Berlin"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  suspend: true
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 60
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+          containers:
+            - name: grid-charge
+              image: REPLACE-IMAGE:latest
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: EVCC_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: evcc-api-key
+                      key: EVCC_API_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+                - name: state
+                  mountPath: /state
+          volumes:
+            - name: config
+              configMap:
+                name: evcc-grid-charge-config
+            - name: state
+              persistentVolumeClaim:
+                claimName: evcc-grid-charge-state
