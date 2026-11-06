@@ -8,6 +8,8 @@ export interface KeepAliveOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Current time in epoch milliseconds. Defaults to the system clock. */
   now?: () => number;
+  /** Aborting ends the run: the sleep wakes early and normal mode is set. */
+  signal?: AbortSignal;
 }
 
 export type ChargeOutcome =
@@ -15,7 +17,8 @@ export type ChargeOutcome =
   | "target-reached"
   | "window-ended"
   | "max-duration-reached"
-  | "no-progress";
+  | "no-progress"
+  | "terminated";
 
 export interface ChargeResult {
   outcome: ChargeOutcome;
@@ -32,7 +35,21 @@ function nextWindowEnd(fromMs: number): number {
   return end.getTime();
 }
 
-const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Resolves after `ms`, or as soon as `signal` aborts. */
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (signal?.aborted) return resolve();
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 /**
  * Starts a grid charge when the battery is below the target state of charge.
@@ -44,7 +61,7 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
  * charge started without reaching the target, sets normal mode and returns
  * "max-duration-reached". Each cycle that raises the state of charge restarts the no-progress
  * timer; once the time since the last rise exceeds the no-progress timeout, sets normal mode and
- * returns "no-progress". Checks run in this order: target, no-progress, window end, max duration.
+ * returns "no-progress". Once `signal` aborts, sets normal mode and returns "terminated". Checks run in this order: target, no-progress, window end, max duration.
  */
 export async function runScheduledCharge(
   settings: { targetSoc: number; maxDurationMinutes: number; noProgressTimeoutMinutes: number },
@@ -52,7 +69,8 @@ export async function runScheduledCharge(
   opts: KeepAliveOptions = {},
 ): Promise<ChargeResult> {
   const intervalMs = opts.intervalMs ?? KEEP_ALIVE_INTERVAL_MS;
-  const sleep = opts.sleep ?? defaultSleep;
+  const signal = opts.signal;
+  const sleep = opts.sleep ?? ((ms: number) => abortableSleep(ms, signal));
   const now = opts.now ?? Date.now;
   const maxDurationMs = settings.maxDurationMinutes * 60_000;
   const noProgressMs = settings.noProgressTimeoutMinutes * 60_000;
@@ -68,6 +86,10 @@ export async function runScheduledCharge(
   await client.setChargeMode();
   for (;;) {
     await sleep(intervalMs);
+    if (signal?.aborted) {
+      await client.setNormalMode();
+      return { outcome: "terminated" };
+    }
     const current = await client.getState();
     if (current.batterySoc > lastSoc) {
       lastSoc = current.batterySoc;

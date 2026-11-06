@@ -4,6 +4,7 @@ import { createEvccClient } from "./evcc-client.ts";
 import { runScheduledCharge } from "./scheduled-charge.ts";
 
 const EXIT_CONFIG_ERROR = 2;
+const EXIT_TERMINATED = 130;
 
 async function main(argv: string[], env: Record<string, string | undefined>): Promise<number> {
   const configPath = argv[2] ?? env.CONFIG_PATH;
@@ -48,6 +49,10 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
     console.error("config error: EVCC_TEST_CLOCK must be an ISO-8601 time");
     return EXIT_CONFIG_ERROR;
   }
+  const controller = new AbortController();
+  const onSignal = () => controller.abort();
+  process.on("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
   try {
     const result = await runScheduledCharge(
       {
@@ -56,8 +61,12 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
         noProgressTimeoutMinutes: cfg.noProgressTimeoutMinutes,
       },
       client,
-      clockOpts,
+      { ...clockOpts, signal: controller.signal },
     );
+    if (result.outcome === "terminated") {
+      console.log("info: termination signal received; battery set to normal mode");
+      return EXIT_TERMINATED;
+    }
     if (result.outcome === "window-ended") {
       console.log("info: tariff window ended at 06:00 before target was reached; battery set to normal mode");
     }

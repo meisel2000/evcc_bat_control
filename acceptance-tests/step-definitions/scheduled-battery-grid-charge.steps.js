@@ -165,10 +165,61 @@ When('the battery state of charge reaches the configured target', { timeout: TAR
   this.run = await result;
 });
 
+const TERMINATION_CHARGE_WAIT_MS = 10 * 1000;
+const TERMINATION_EXIT_TIMEOUT_MS = 10 * 1000;
+
+const countNormalRequests = (evcc) =>
+  evcc.requests.filter((r) => r.method === 'POST' && r.path === '/batterymode/normal').length;
+
+// Starts the real app (real clock), waits until it is charging, then sends
+// SIGTERM and records how many normal-mode POSTs existed before the signal.
+When('the job receives a termination signal', { timeout: TERMINATION_CHARGE_WAIT_MS + TERMINATION_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
+  const { child, result } = await startApp(this.evcc.url, { targetSoc: this.targetSoc });
+  const isRunning = () => child.exitCode === null && child.signalCode === null;
+  const chargeSent = () =>
+    this.evcc.requests.some((r) => r.method === 'POST' && r.path === '/batterymode/charge');
+  const chargeDeadline = Date.now() + TERMINATION_CHARGE_WAIT_MS;
+  while (isRunning() && !chargeSent() && Date.now() < chargeDeadline) {
+    await sleep(50);
+  }
+  this.normalCountBeforeSignal = countNormalRequests(this.evcc);
+  this.signalSent = true;
+  if (isRunning()) {
+    child.kill('SIGTERM');
+  }
+  const exitDeadline = Date.now() + TERMINATION_EXIT_TIMEOUT_MS;
+  let timer;
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), Math.max(0, exitDeadline - Date.now()));
+  });
+  const exited = await Promise.race([result.then(() => true), timedOut]);
+  clearTimeout(timer);
+  if (!exited) {
+    child.kill('SIGKILL');
+  }
+  this.run = await result;
+  this.terminationExited = exited;
+});
+
 Then('the battery is set to normal mode', function () {
   const normalRequests = this.evcc.requests.filter(
     (r) => r.method === 'POST' && r.path === '/batterymode/normal',
   );
+  if (this.signalSent) {
+    // Termination scenario: the normal-mode POST must be sent after SIGTERM.
+    assert.equal(
+      this.normalCountBeforeSignal,
+      0,
+      `expected no POST /batterymode/normal before the termination signal, got ${this.normalCountBeforeSignal}`,
+    );
+    assert.ok(
+      normalRequests.length > this.normalCountBeforeSignal,
+      `expected a POST /batterymode/normal after SIGTERM, but none was sent ` +
+        `(app exited: ${this.terminationExited}, exit code ${this.run.exitCode}, ` +
+        `signal ${this.run.signal ?? 'none'}, stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+    );
+    return;
+  }
   assert.ok(
     normalRequests.length > 0,
     `expected a POST /batterymode/normal to evcc, but none was sent ` +

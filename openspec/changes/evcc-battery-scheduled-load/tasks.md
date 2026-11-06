@@ -28,7 +28,7 @@
 
 ### 2.D Restore normal mode on exit
 
-- [ ] 2.8 scheduled-battery-grid-charge: "When the job receives a termination signal" / "Then the battery is set to normal mode" — red → green → commit
+- [x] 2.8 scheduled-battery-grid-charge: "When the job receives a termination signal" / "Then the battery is set to normal mode" — red → green → commit
 
 ### 2.E Startup recovery of own charge session
 

@@ -131,3 +131,21 @@ test("stops at maximum duration, sets normal mode and reports failure", async ()
   assert.equal(calls.filter((c) => c === "setNormalMode").length, 1);
   assert.equal(t - start, 120 * 60_000);
 });
+
+test("sends normal mode and returns terminated when aborted while charging", async () => {
+  const { client, calls } = fakeClient(40);
+  const controller = new AbortController();
+  let sleeps = 0;
+  const sleep = async () => {
+    sleeps += 1;
+    if (sleeps > 1) throw new StopLoop();
+    controller.abort();
+  };
+  const result = await runScheduledCharge(
+    { targetSoc: 90, maxDurationMinutes: 120, noProgressTimeoutMinutes: 1_000 },
+    client,
+    { sleep, now: midday, signal: controller.signal },
+  );
+  assert.deepEqual(result, { outcome: "terminated" });
+  assert.deepEqual(calls, ["getState", "setChargeMode", "setNormalMode"]);
+});
