@@ -17,6 +17,7 @@
     "@cucumber/cucumber": "^13.3.0",
     "cheerio": "^1.2.0",
     "gherkin-lint": "^4.2.4",
-    "glob": "^14.0.4"
+    "glob": "^14.0.4",
+    "yaml": "^2.9.1"
   }
 }

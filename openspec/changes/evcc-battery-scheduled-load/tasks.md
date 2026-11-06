@@ -54,8 +54,8 @@
 
 ### 2.J Winter cheap-tariff schedule
 
-- [ ] 2.16 scheduled-battery-grid-charge: "Given the current date is in March" / "Then no job is started" — red → green → commit
-- [ ] 2.17 scheduled-battery-grid-charge: "Given the current date is in January" / "And the CronJob start time is 02:00" / "Then a job is started" — red → green → commit
+- [x] 2.16 scheduled-battery-grid-charge: "Given the current date is in March" / "Then no job is started" — red → green → commit
+- [x] 2.17 scheduled-battery-grid-charge: "Given the current date is in January" / "And the CronJob start time is 02:00" / "Then a job is started" — red → green → commit
 
 ### 2.K Packaging and deployment (non-BDD, covered by manifest and image review)
 
