@@ -1,4 +1,5 @@
 import type { EvccClient } from "./evcc-client.ts";
+import type { StateMarker } from "./state-marker.ts";
 
 /** evcc resets external battery mode after 60 s; refresh at half that to keep a margin. */
 export const KEEP_ALIVE_INTERVAL_MS = 30_000;
@@ -10,6 +11,8 @@ export interface KeepAliveOptions {
   now?: () => number;
   /** Aborting ends the run: the sleep wakes early and normal mode is set. */
   signal?: AbortSignal;
+  /** Records ownership of a started charge. Omitted means no ownership record. */
+  marker?: StateMarker;
 }
 
 export type ChargeOutcome =
@@ -75,7 +78,16 @@ export async function runScheduledCharge(
   const maxDurationMs = settings.maxDurationMinutes * 60_000;
   const noProgressMs = settings.noProgressTimeoutMinutes * 60_000;
 
+  const marker = opts.marker;
+  const restoreNormal = async () => {
+    await client.setNormalMode();
+    await marker?.clear();
+  };
+
   const state = await client.getState();
+  if (state.batteryMode === "charge" && marker && (await marker.read())) {
+    await restoreNormal();
+  }
   if (state.batterySoc >= settings.targetSoc) {
     return { outcome: "no-charge-needed" };
   }
@@ -83,11 +95,12 @@ export async function runScheduledCharge(
   const windowEnd = nextWindowEnd(chargeStart);
   let lastSoc = state.batterySoc;
   let lastRiseAt = chargeStart;
+  await marker?.write(new Date(chargeStart).toISOString());
   await client.setChargeMode();
   for (;;) {
     await sleep(intervalMs);
     if (signal?.aborted) {
-      await client.setNormalMode();
+      await restoreNormal();
       return { outcome: "terminated" };
     }
     const current = await client.getState();
@@ -96,19 +109,19 @@ export async function runScheduledCharge(
       lastRiseAt = now();
     }
     if (current.batterySoc >= settings.targetSoc) {
-      await client.setNormalMode();
+      await restoreNormal();
       return { outcome: "target-reached" };
     }
     if (now() - lastRiseAt > noProgressMs) {
-      await client.setNormalMode();
+      await restoreNormal();
       return { outcome: "no-progress" };
     }
     if (now() >= windowEnd) {
-      await client.setNormalMode();
+      await restoreNormal();
       return { outcome: "window-ended" };
     }
     if (now() - chargeStart >= maxDurationMs) {
-      await client.setNormalMode();
+      await restoreNormal();
       return { outcome: "max-duration-reached" };
     }
     await client.setChargeMode();

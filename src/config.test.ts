@@ -8,6 +8,7 @@ const validFile = {
   maxDurationMinutes: 120,
   noProgressTimeoutMinutes: 30,
   httpTimeoutMs: 5000,
+  statePath: "/state/state.json",
 };
 
 const env = { EVCC_API_KEY: "evcc_test_key" };
@@ -20,6 +21,28 @@ test("accepts a valid config and applies defaults", () => {
   assert.equal(cfg.noProgressTimeoutMinutes, 30);
   assert.equal(cfg.httpTimeoutMs, 5000);
   assert.equal(cfg.dryRun, false);
+});
+
+test("returns the state marker path", () => {
+  const cfg = loadConfig(validFile, env);
+  assert.equal(cfg.statePath, "/state/state.json");
+});
+
+test("rejects a missing state marker path and names it", () => {
+  const { statePath: _omit, ...rest } = validFile;
+  assert.throws(
+    () => loadConfig(rest, env),
+    (err: unknown) =>
+      err instanceof ConfigError && /statePath/.test(err.message),
+  );
+});
+
+test("rejects an empty state marker path", () => {
+  assert.throws(
+    () => loadConfig({ ...validFile, statePath: "  " }, env),
+    (err: unknown) =>
+      err instanceof ConfigError && /statePath/.test(err.message),
+  );
 });
 
 test("reads the API key from the environment only", () => {

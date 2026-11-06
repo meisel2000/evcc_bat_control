@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { loadConfig, ConfigError } from "./config.ts";
 import { createEvccClient } from "./evcc-client.ts";
 import { runScheduledCharge } from "./scheduled-charge.ts";
+import { createFileStateMarker } from "./state-marker.ts";
 
 const EXIT_CONFIG_ERROR = 2;
 const EXIT_TERMINATED = 130;
@@ -37,7 +38,7 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
     `started: evccUrl=${cfg.evccUrl} targetSoc=${cfg.targetSoc} ` +
       `maxDurationMinutes=${cfg.maxDurationMinutes} ` +
       `noProgressTimeoutMinutes=${cfg.noProgressTimeoutMinutes} ` +
-      `httpTimeoutMs=${cfg.httpTimeoutMs} dryRun=${cfg.dryRun}`,
+      `httpTimeoutMs=${cfg.httpTimeoutMs} dryRun=${cfg.dryRun} statePath=${cfg.statePath}`,
   );
   const client = createEvccClient({
     baseUrl: cfg.evccUrl,
@@ -61,7 +62,7 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
         noProgressTimeoutMinutes: cfg.noProgressTimeoutMinutes,
       },
       client,
-      { ...clockOpts, signal: controller.signal },
+      { ...clockOpts, signal: controller.signal, marker: createFileStateMarker(cfg.statePath) },
     );
     if (result.outcome === "terminated") {
       console.log("info: termination signal received; battery set to normal mode");

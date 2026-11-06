@@ -38,6 +38,10 @@ class FakeEvcc {
     this.state.battery = { ...this.state.battery, soc };
   }
 
+  setBatteryMode(batteryMode) {
+    this.state.batteryMode = batteryMode;
+  }
+
   handle(req, res) {
     let body = '';
     req.on('data', (chunk) => (body += chunk));

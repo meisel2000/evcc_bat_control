@@ -149,3 +149,154 @@ test("sends normal mode and returns terminated when aborted while charging", asy
   assert.deepEqual(result, { outcome: "terminated" });
   assert.deepEqual(calls, ["getState", "setChargeMode", "setNormalMode"]);
 });
+
+/** Client whose startup batteryMode is configurable; records calls into `calls`. */
+function modeClient(batteryMode: string, batterySoc: number, calls: string[]): EvccClient {
+  return {
+    async getState() {
+      calls.push("getState");
+      return { batteryMode, batterySoc };
+    },
+    async setChargeMode() {
+      calls.push("setChargeMode");
+    },
+    async setNormalMode() {
+      calls.push("setNormalMode");
+    },
+  };
+}
+
+/** Marker stub recording writes and clears into `calls`; `read` returns `stored`. */
+function markerStub(stored: { startedAt: string } | null, calls: string[], opts: { writeFails?: boolean } = {}) {
+  return {
+    async read() {
+      calls.push("markerRead");
+      return stored;
+    },
+    async write(startedAt: string) {
+      calls.push("markerWrite");
+      if (opts.writeFails) throw new Error("PVC unavailable");
+      void startedAt;
+    },
+    async clear() {
+      calls.push("markerClear");
+    },
+  };
+}
+
+const settings = { targetSoc: 90, maxDurationMinutes: 120, noProgressTimeoutMinutes: 1_000 };
+
+test("sets normal mode at startup when the state marker shows the job started the charge", async () => {
+  const calls: string[] = [];
+  const client = modeClient("charge", 92, calls);
+  await runScheduledCharge(settings, client, {
+    now: midday,
+    marker: markerStub({ startedAt: "2026-01-10T01:00:00.000Z" }, calls),
+  });
+  assert.deepEqual(calls, ["getState", "markerRead", "setNormalMode", "markerClear"]);
+});
+
+test("leaves a charge unchanged at startup when no state marker exists", async () => {
+  const calls: string[] = [];
+  const client = modeClient("charge", 92, calls);
+  await runScheduledCharge(settings, client, { now: midday, marker: markerStub(null, calls) });
+  assert.deepEqual(calls, ["getState", "markerRead"]);
+});
+
+test("does not read the state marker when batteryMode is not charge at startup", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 92, calls);
+  await runScheduledCharge(settings, client, { now: midday, marker: markerStub({ startedAt: "x" }, calls) });
+  assert.deepEqual(calls, ["getState"]);
+});
+
+test("writes the state marker before sending charge mode", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  const { sleep } = fakeSleep(0);
+  await assert.rejects(runScheduledCharge(settings, client, { sleep, now: midday, marker: markerStub(null, calls) }), StopLoop);
+  assert.deepEqual(calls, ["getState", "markerWrite", "setChargeMode"]);
+});
+
+test("does not send charge mode when the state marker cannot be written", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  const { sleep } = fakeSleep(0);
+  await assert.rejects(
+    runScheduledCharge(settings, client, { sleep, now: midday, marker: markerStub(null, calls, { writeFails: true }) }),
+    /PVC unavailable/,
+  );
+  assert.deepEqual(calls, ["getState", "markerWrite"]);
+});
+
+test("clears the state marker after restoring normal mode when the target is reached", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  let soc = 40;
+  client.getState = async () => {
+    calls.push("getState");
+    return { batteryMode: "charge", batterySoc: soc };
+  };
+  const sleep = async () => {
+    soc = 90;
+  };
+  await runScheduledCharge(settings, client, { sleep, now: midday, marker: markerStub(null, calls) });
+  assert.deepEqual(calls.slice(-2), ["setNormalMode", "markerClear"]);
+});
+
+test("clears the state marker after restoring normal mode when the window ends", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  let t = new Date(2026, 0, 10, 5, 59, 0).getTime();
+  const sleep = async (ms: number) => {
+    t += ms;
+  };
+  await runScheduledCharge(settings, client, { sleep, now: () => t, marker: markerStub(null, calls) });
+  assert.deepEqual(calls.slice(-2), ["setNormalMode", "markerClear"]);
+});
+
+test("clears the state marker after restoring normal mode when the maximum duration is reached", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  const start = midday();
+  let t = start;
+  const sleep = async (ms: number) => {
+    t += ms;
+  };
+  await runScheduledCharge({ ...settings, maxDurationMinutes: 1 }, client, {
+    sleep,
+    now: () => t,
+    marker: markerStub(null, calls),
+  });
+  assert.deepEqual(calls.slice(-2), ["setNormalMode", "markerClear"]);
+});
+
+test("clears the state marker after restoring normal mode when there is no progress", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  const start = midday();
+  let t = start;
+  const sleep = async (ms: number) => {
+    t += ms;
+  };
+  await runScheduledCharge({ ...settings, noProgressTimeoutMinutes: 1 }, client, {
+    sleep,
+    now: () => t,
+    marker: markerStub(null, calls),
+  });
+  assert.deepEqual(calls.slice(-2), ["setNormalMode", "markerClear"]);
+});
+
+test("clears the state marker after restoring normal mode when terminated", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  const controller = new AbortController();
+  const sleep = async () => controller.abort();
+  await runScheduledCharge(settings, client, {
+    sleep,
+    now: midday,
+    signal: controller.signal,
+    marker: markerStub(null, calls),
+  });
+  assert.deepEqual(calls.slice(-2), ["setNormalMode", "markerClear"]);
+});

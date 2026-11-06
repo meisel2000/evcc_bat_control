@@ -12,6 +12,8 @@ export interface AppConfig {
   noProgressTimeoutMinutes: number;
   httpTimeoutMs: number;
   dryRun: boolean;
+  /** Path of the state marker file (on the PVC). */
+  statePath: string;
   /** Read from the environment only. Never log this value. */
   apiKey: string;
 }
@@ -54,6 +56,11 @@ export function loadConfig(raw: unknown, env: Env = process.env): AppConfig {
     throw new ConfigError(`targetSoc must be between 0 and 100 (got ${JSON.stringify(targetSoc)})`);
   }
 
+  const statePath = file.statePath;
+  if (typeof statePath !== "string" || statePath.trim() === "") {
+    throw new ConfigError("statePath is required");
+  }
+
   const apiKey = env.EVCC_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
     throw new ConfigError("EVCC_API_KEY environment variable is required");
@@ -66,6 +73,7 @@ export function loadConfig(raw: unknown, env: Env = process.env): AppConfig {
     noProgressTimeoutMinutes: positiveNumber(file, "noProgressTimeoutMinutes", DEFAULTS.noProgressTimeoutMinutes),
     httpTimeoutMs: positiveNumber(file, "httpTimeoutMs", DEFAULTS.httpTimeoutMs),
     dryRun: file.dryRun === undefined ? DEFAULTS.dryRun : file.dryRun === true,
+    statePath: statePath.trim(),
     apiKey: apiKey.trim(),
   };
 }

@@ -2,6 +2,9 @@
 
 const assert = require('node:assert/strict');
 const { Given, When, Then } = require('@cucumber/cucumber');
+const { mkdtemp, writeFile } = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const { startApp } = require('../support/app.js');
 
 const CHARGE_WINDOW_MS = 90 * 1000;
@@ -296,3 +299,45 @@ When('the no-progress timeout is reached', { timeout: NO_PROGRESS_EXIT_TIMEOUT_M
       `got stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()}`,
   );
 });
+
+// Startup recovery of own charge session (spec: "Stale charge from a previous
+// failed run is cleared"). The state marker lives in a per-scenario temp dir.
+const statePathFor = async (world) => {
+  if (world.statePath === undefined) {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'evcc-state-'));
+    world.statePath = path.join(dir, 'state.json');
+  }
+  return world.statePath;
+};
+
+Given('the battery mode is charge', function () {
+  this.evcc.setBatteryMode('charge');
+});
+
+Given('the state marker shows that a previous run of this job started the charge', async function () {
+  const statePath = await statePathFor(this);
+  await writeFile(
+    statePath,
+    JSON.stringify({ startedAt: new Date(Date.now() - 60 * 1000).toISOString() }),
+  );
+});
+
+// Real clock. SoC is set to 92 (above target 90) so the job does not start a
+// new charge after recovery; any normal-mode POST is therefore recovery.
+const STARTUP_EXIT_TIMEOUT_MS = 30 * 1000;
+
+When('the job starts', { timeout: STARTUP_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
+  this.evcc.setBatterySoc(92);
+  const statePath = await statePathFor(this);
+  const { child, result } = await startApp(this.evcc.url, { targetSoc: 90 }, { statePath });
+  const isRunning = () => child.exitCode === null && child.signalCode === null;
+  const deadline = Date.now() + STARTUP_EXIT_TIMEOUT_MS;
+  while (isRunning() && Date.now() < deadline) {
+    await sleep(50);
+  }
+  if (isRunning()) {
+    child.kill('SIGTERM');
+  }
+  this.run = await result;
+});
+

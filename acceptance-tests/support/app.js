@@ -15,10 +15,13 @@ const TEST_API_KEY = 'evcc_test_key_for_acceptance';
 // Starts the app without waiting for it to exit. Returns the child process
 // (so a step can observe it or stop it) and a promise for the final result.
 // `options.env` adds environment variables for the child (e.g. EVCC_TEST_CLOCK).
+// `options.statePath` sets the state marker file path (config field statePath);
+// default is a fresh temp file per run, which does not exist unless a step writes it.
 async function startApp(evccUrl, settings = {}, options = {}) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'evcc-accept-'));
   const configPath = path.join(dir, 'config.json');
-  const config = { evccUrl, targetSoc: 90, ...settings };
+  const statePath = options.statePath ?? path.join(dir, 'state.json');
+  const config = { evccUrl, targetSoc: 90, statePath, ...settings };
   await writeFile(configPath, JSON.stringify(config));
 
   const child = spawn(process.execPath, [APP_ENTRY, configPath], {
