@@ -17,7 +17,7 @@
 
 ### 2.B Keep-alive refresh of charge mode
 
-- [ ] 2.3 scheduled-battery-grid-charge: "Given the battery is charging from the grid" / "When 90 seconds have passed" / "Then charge mode has been sent at least 3 times during the charge" — red → green → commit
+- [x] 2.3 scheduled-battery-grid-charge: "Given the battery is charging from the grid" / "When 90 seconds have passed" / "Then charge mode has been sent at least 3 times during the charge" — red → green → commit
 
 ### 2.C Charge stop conditions
 

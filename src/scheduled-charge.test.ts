@@ -17,10 +17,31 @@ function fakeClient(batterySoc: number) {
   return { client, calls };
 }
 
+class StopLoop extends Error {}
+
+/** Sleep stub that records requested delays and stops the loop after `count` sleeps. */
+function fakeSleep(count: number) {
+  const delays: number[] = [];
+  const sleep = async (ms: number) => {
+    delays.push(ms);
+    if (delays.length >= count) throw new StopLoop();
+  };
+  return { sleep, delays };
+}
+
 test("sets charge mode when battery soc is below target", async () => {
   const { client, calls } = fakeClient(40);
-  await runScheduledCharge({ targetSoc: 90 }, client);
+  const { sleep } = fakeSleep(0);
+  await assert.rejects(runScheduledCharge({ targetSoc: 90 }, client, { sleep }), StopLoop);
   assert.deepEqual(calls, ["getState", "setChargeMode"]);
+});
+
+test("re-sends charge mode every 30 seconds while charging", async () => {
+  const { client, calls } = fakeClient(40);
+  const { sleep, delays } = fakeSleep(2);
+  await assert.rejects(runScheduledCharge({ targetSoc: 90 }, client, { sleep }), StopLoop);
+  assert.deepEqual(calls, ["getState", "setChargeMode", "setChargeMode"]);
+  assert.deepEqual(delays, [30_000, 30_000]);
 });
 
 test("sends no mode change when battery soc is at target", async () => {
