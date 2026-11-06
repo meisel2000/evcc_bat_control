@@ -5,7 +5,7 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { mkdtemp, rm, writeFile } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { startApp } = require('../support/app.js');
+const { startApp, TEST_API_KEY } = require('../support/app.js');
 
 const CHARGE_WINDOW_MS = 90 * 1000;
 const CHARGE_WINDOW_TIMEOUT_MS = CHARGE_WINDOW_MS + 30 * 1000;
@@ -445,5 +445,42 @@ Then('the error names the target state of charge', function () {
     output,
     /state of charge/i,
     `expected error to name the state of charge, got stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()}`,
+  );
+});
+
+// API key authentication (spec: "Request carries the API key"). The key is
+// handed to the job through the environment, as the Kubernetes Secret would.
+Given('the API key is provided by the Kubernetes Secret', function () {
+  this.apiKey = TEST_API_KEY;
+});
+
+// Battery already at target, so the job exits quickly after one state read.
+When('the job requests the evcc state', async function () {
+  this.evcc.setBatterySoc(90);
+  this.run = await startApp(this.evcc.url, { targetSoc: 90 }).then(({ result }) => result);
+});
+
+Then('the request carries the API key as a bearer token', function () {
+  const stateRequests = this.evcc.requests.filter(
+    (r) => r.method === 'GET' && r.path === '/state',
+  );
+  assert.ok(
+    stateRequests.length > 0,
+    `expected a GET /state request to evcc, but none was recorded ` +
+      `(app exit code ${this.run.exitCode}, stderr: ${this.run.stderr.trim()})`,
+  );
+  assert.ok(
+    stateRequests.some((r) => r.authorization === `Bearer ${this.apiKey}`),
+    `expected Authorization "Bearer ${this.apiKey}" on GET /state, got ` +
+      `${JSON.stringify(stateRequests.map((r) => r.authorization))}`,
+  );
+});
+
+Then('the API key does not appear in the logs', function () {
+  const output = `${this.run.stdout}\n${this.run.stderr}`;
+  assert.ok(
+    !output.includes(this.apiKey),
+    `expected the API key to be absent from stdout and stderr, but it appeared ` +
+      `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
   );
 });

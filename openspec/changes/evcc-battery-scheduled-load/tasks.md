@@ -46,7 +46,7 @@
 
 ### 2.H API key authentication
 
-- [ ] 2.14 scheduled-battery-grid-charge: "Given the API key is provided by the Kubernetes Secret" / "Then the request carries the API key as a bearer token" / "And the API key does not appear in the logs" — red → green → commit
+- [x] 2.14 scheduled-battery-grid-charge: "Given the API key is provided by the Kubernetes Secret" / "Then the request carries the API key as a bearer token" / "And the API key does not appear in the logs" — red → green → commit
 
 ### 2.I Dry-run mode
 
