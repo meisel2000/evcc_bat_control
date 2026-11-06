@@ -1,7 +1,7 @@
 ## 1. First-time setup — skip this whole section if `acceptance-tests/` already exists
 
-- [ ] 1.1 Confirm the acceptance stack: read `stack:` from `openspec/config.yaml` (`javascript` or `python`). If absent, ask and add it — this is a specs-zone edit and must be committed on its own, before any scaffolding
-- [ ] 1.2 Set up the application skeleton (TypeScript/Node.js entry point, dependencies, run script, config loader for the evcc URL, target SoC, max duration, no-progress timeout, HTTP timeouts) so the app can boot
+- [x] 1.1 Confirm the acceptance stack: read `stack:` from `openspec/config.yaml` (`javascript` or `python`). If absent, ask and add it — this is a specs-zone edit and must be committed on its own, before any scaffolding
+- [x] 1.2 Set up the application skeleton (TypeScript/Node.js entry point, dependencies, run script, config loader for the evcc URL, target SoC, max duration, no-progress timeout, HTTP timeouts) so the app can boot
 - [ ] 1.3 Create `acceptance-tests/` at the repo root as an independent `<stack>` project that boots the app before the suite and shuts it down after, with a fake evcc REST server (`GET /state`, `POST /batterymode/charge`, `POST /batterymode/normal`, `DELETE /batterymode`) for scenarios
 - [ ] 1.4 Copy the acceptance-test-authoring skill's `<stack>` reference files verbatim into `acceptance-tests/` — see `references/<stack>/SETUP.md` "Files to copy"; destination filenames are load-bearing — so the runner extracts the Gherkin from every `spec.md` under `openspec/` into `acceptance-tests/.extracted/` and discovers the extracted features, excluding `openspec/changes/archive/`
 - [ ] 1.5 Make the single test command always generate an HTML report under `acceptance-tests/reports/`

@@ -1,0 +1,15 @@
+{
+  "name": "evcc-battery-scheduled-load",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-shot job that charges the home battery from the grid via the evcc API",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test src/*.test.ts"
+  },
+  "license": "UNLICENSED"
+}
