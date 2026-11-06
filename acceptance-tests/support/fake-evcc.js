@@ -32,6 +32,12 @@ class FakeEvcc {
   reset(state = {}) {
     this.state = { batteryMode: 'normal', battery: { soc: 50 }, ...state };
     this.requests = [];
+    this.stateFailing = false;
+  }
+
+  // When true, GET /state answers HTTP 500 so the job cannot read the state of charge.
+  setStateFailing(failing) {
+    this.stateFailing = failing;
   }
 
   setBatterySoc(soc) {
@@ -57,6 +63,9 @@ class FakeEvcc {
         res.end(payload === undefined ? '' : JSON.stringify(payload));
       };
       if (req.method === 'GET' && req.url === '/state') {
+        if (this.stateFailing) {
+          return send(500, { error: 'internal error' });
+        }
         return send(200, this.state);
       }
       if (req.method === 'POST' && req.url === '/batterymode/charge') {

@@ -326,6 +326,44 @@ When('the no-progress timeout is reached', { timeout: NO_PROGRESS_EXIT_TIMEOUT_M
   );
 });
 
+// State-of-charge read failure during a charge (spec: "Failure handling").
+// The failure is armed in the When step, after the charge POST is observed, so
+// the next keep-alive read (about every 30 s) fails mid-charge.
+const SOC_READ_CHARGE_WAIT_MS = 15 * 1000;
+const SOC_READ_EXIT_TIMEOUT_MS = 35 * 1000;
+
+Given('the state of charge cannot be read', function () {
+  // Intent recorded; the failure itself is armed in the When step after the
+  // charge POST, so the initial charge is started with a readable state.
+  this.socReadFailureExpected = true;
+});
+
+When('the next state of charge read fails', { timeout: SOC_READ_CHARGE_WAIT_MS + SOC_READ_EXIT_TIMEOUT_MS + 15 * 1000 }, async function () {
+  const { child, result } = await startApp(this.evcc.url, { targetSoc: this.targetSoc });
+  const isRunning = () => child.exitCode === null && child.signalCode === null;
+  const chargeSent = () =>
+    this.evcc.requests.some((r) => r.method === 'POST' && r.path === '/batterymode/charge');
+  const chargeDeadline = Date.now() + SOC_READ_CHARGE_WAIT_MS;
+  while (isRunning() && !chargeSent() && Date.now() < chargeDeadline) {
+    await sleep(50);
+  }
+  this.evcc.setStateFailing(true);
+  const deadline = Date.now() + SOC_READ_EXIT_TIMEOUT_MS;
+  while (isRunning() && Date.now() < deadline) {
+    await sleep(50);
+  }
+  if (isRunning()) {
+    child.kill('SIGTERM');
+    this.run = await result;
+    assert.fail(
+      `expected app to exit after a failed state of charge read within ` +
+        `${SOC_READ_EXIT_TIMEOUT_MS / 1000} s, but it kept running ` +
+        `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+    );
+  }
+  this.run = await result;
+});
+
 // Startup recovery of own charge session (spec: "Stale charge from a previous
 // failed run is cleared"). The state marker lives in a per-scenario temp dir.
 const statePathFor = async (world) => {

@@ -20,11 +20,14 @@ export type ChargeOutcome =
   | "target-reached"
   | "window-ended"
   | "max-duration-reached"
-  | "no-progress"
+  "no-progress"
+  | "state-read-failed"
   | "terminated";
 
 export interface ChargeResult {
   outcome: ChargeOutcome;
+  /** Set when normal mode could not be restored after a state read failure. */
+  normalModeError?: string;
 }
 
 /**
@@ -64,7 +67,7 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
  * charge started without reaching the target, sets normal mode and returns
  * "max-duration-reached". Each cycle that raises the state of charge restarts the no-progress
  * timer; once the time since the last rise exceeds the no-progress timeout, sets normal mode and
- * returns "no-progress". Once `signal` aborts, sets normal mode and returns "terminated". Checks run in this order: target, no-progress, window end, max duration.
+ * returns "no-progress". Once `signal` aborts, sets normal mode and returns "terminated". If the state of charge cannot be read while charging, attempts normal mode (a failure there is reported via `normalModeError`, and the marker is kept) and returns "state-read-failed". Checks run in this order: target, no-progress, window end, max duration.
  */
 export async function runScheduledCharge(
   settings: { targetSoc: number; maxDurationMinutes: number; noProgressTimeoutMinutes: number },
@@ -103,7 +106,17 @@ export async function runScheduledCharge(
       await restoreNormal();
       return { outcome: "terminated" };
     }
-    const current = await client.getState();
+    let current;
+    try {
+      current = await client.getState();
+    } catch {
+      try {
+        await restoreNormal();
+        return { outcome: "state-read-failed" };
+      } catch (err) {
+        return { outcome: "state-read-failed", normalModeError: (err as Error).message };
+      }
+    }
     if (current.batterySoc > lastSoc) {
       lastSoc = current.batterySoc;
       lastRiseAt = now();

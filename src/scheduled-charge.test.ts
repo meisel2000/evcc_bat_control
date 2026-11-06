@@ -287,6 +287,42 @@ test("clears the state marker after restoring normal mode when there is no progr
   assert.deepEqual(calls.slice(-2), ["setNormalMode", "markerClear"]);
 });
 
+test("sets normal mode, clears the marker and reports state read failure when state cannot be read while charging", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  let reads = 0;
+  client.getState = async () => {
+    calls.push("getState");
+    reads += 1;
+    if (reads > 1) throw new Error("evcc unreachable");
+    return { batteryMode: "normal", batterySoc: 40 };
+  };
+  const sleep = async () => {};
+  const result = await runScheduledCharge(settings, client, { sleep, now: midday, marker: markerStub(null, calls) });
+  assert.deepEqual(result, { outcome: "state-read-failed" });
+  assert.deepEqual(calls, ["getState", "markerWrite", "setChargeMode", "getState", "setNormalMode", "markerClear"]);
+});
+
+test("keeps the state marker and reports normal mode failure when state read fails and normal mode cannot be set", async () => {
+  const calls: string[] = [];
+  const client = modeClient("normal", 40, calls);
+  let reads = 0;
+  client.getState = async () => {
+    calls.push("getState");
+    reads += 1;
+    if (reads > 1) throw new Error("evcc unreachable");
+    return { batteryMode: "normal", batterySoc: 40 };
+  };
+  client.setNormalMode = async () => {
+    calls.push("setNormalMode");
+    throw new Error("set mode failed");
+  };
+  const result = await runScheduledCharge(settings, client, { sleep: async () => {}, now: midday, marker: markerStub(null, calls) });
+  assert.equal(result.outcome, "state-read-failed");
+  assert.equal(result.normalModeError, "set mode failed");
+  assert.deepEqual(calls, ["getState", "markerWrite", "setChargeMode", "getState", "setNormalMode"]);
+});
+
 test("clears the state marker after restoring normal mode when terminated", async () => {
   const calls: string[] = [];
   const client = modeClient("normal", 40, calls);

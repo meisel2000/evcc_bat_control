@@ -83,6 +83,13 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
       );
       return 1;
     }
+    if (result.outcome === "state-read-failed") {
+      console.error("error: could not read state of charge; battery set to normal mode");
+      if (result.normalModeError !== undefined) {
+        console.error(`error: could not set normal mode: ${result.normalModeError}`);
+      }
+      return 1;
+    }
   } catch (err) {
     console.error(`error: ${(err as Error).message}`);
     return 1;

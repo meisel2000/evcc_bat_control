@@ -38,7 +38,7 @@
 ### 2.F Failure handling
 
 - [x] 2.11 scheduled-battery-grid-charge: "Given evcc cannot be reached" / "Then an error is logged" / "And the run exits with a non-zero exit code" — red → green → commit
-- [ ] 2.12 scheduled-battery-grid-charge: "And the state of charge cannot be read" / "When the next state of charge read fails" / "Then the battery is set to normal mode" — red → green → commit
+- [x] 2.12 scheduled-battery-grid-charge: "And the state of charge cannot be read" / "When the next state of charge read fails" / "Then the battery is set to normal mode" — red → green → commit
 
 ### 2.G Configuration validation
 
