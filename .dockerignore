@@ -7,5 +7,4 @@ openspec
 reports
 adr
 deploy
-**/*.test.ts
 **/.DS_Store
