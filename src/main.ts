@@ -44,6 +44,7 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
     baseUrl: cfg.evccUrl,
     apiKey: cfg.apiKey,
     timeoutMs: cfg.httpTimeoutMs,
+    dryRun: cfg.dryRun,
   });
   const clockOpts = testClockOptions(env);
   if (clockOpts === null) {

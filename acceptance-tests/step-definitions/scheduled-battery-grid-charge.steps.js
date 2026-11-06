@@ -102,7 +102,11 @@ Given('evcc cannot be reached', function () {
 // it if still running and record the result.
 When('the scheduled run starts', { timeout: SCHEDULED_RUN_OBSERVE_MS + 15 * 1000 }, async function () {
   const evccUrl = this.evccUrl ?? this.evcc.url;
-  const { child, result } = await startApp(evccUrl, { targetSoc: this.targetSoc });
+  const settings = { targetSoc: this.targetSoc ?? 90 };
+  if (this.dryRun) {
+    settings.dryRun = true;
+  }
+  const { child, result } = await startApp(evccUrl, settings);
   const isRunning = () => child.exitCode === null && child.signalCode === null;
   const chargeSent = () =>
     this.evcc.requests.some((r) => r.method === 'POST' && r.path === '/batterymode/charge');
@@ -482,5 +486,32 @@ Then('the API key does not appear in the logs', function () {
     !output.includes(this.apiKey),
     `expected the API key to be absent from stdout and stderr, but it appeared ` +
       `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+  );
+});
+
+// Dry-run mode (spec: "Dry-run mode"). The config file carries dryRun: true;
+// the app must log the intended charge mode change and send no mode change.
+Given('dry-run mode is enabled', function () {
+  this.dryRun = true;
+});
+
+Then('the intended charge mode change is logged', function () {
+  const output = `${this.run.stdout}\n${this.run.stderr}`;
+  assert.match(
+    output,
+    /dry.?run.*charge|would.*charge/i,
+    `expected a dry-run log line naming the intended charge mode change ` +
+      `(e.g. "dry-run: would set charge mode"), got stdout: ${this.run.stdout.trim()}, ` +
+      `stderr: ${this.run.stderr.trim()}`,
+  );
+});
+
+Then('no POST or DELETE request is sent to evcc', function () {
+  const mutating = this.evcc.requests.filter((r) => r.method === 'POST' || r.method === 'DELETE');
+  assert.equal(
+    mutating.length,
+    0,
+    `expected no POST or DELETE to evcc in dry-run mode, but ${mutating.length} were sent ` +
+      `(${mutating.map((r) => `${r.method} ${r.path}`).join(', ')})`,
   );
 });

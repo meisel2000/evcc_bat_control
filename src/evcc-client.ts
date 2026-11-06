@@ -13,6 +13,8 @@ export interface EvccClientOptions {
   baseUrl: string;
   apiKey: string;
   timeoutMs: number;
+  /** When true, mode changes are logged instead of sent. Reads still go to evcc. */
+  dryRun?: boolean;
   fetch?: typeof fetch;
 }
 
@@ -24,6 +26,7 @@ export function createEvccClient(opts: EvccClientOptions): EvccClient {
   const base = opts.baseUrl.replace(/\/+$/, "");
   const doFetch = opts.fetch ?? fetch;
   const headers = { Authorization: `Bearer ${opts.apiKey}` };
+  const dryRun = opts.dryRun === true;
 
   async function request(method: "GET" | "POST", path: string): Promise<Response> {
     const res = await doFetch(`${base}${path}`, {
@@ -44,9 +47,17 @@ export function createEvccClient(opts: EvccClientOptions): EvccClient {
       return { batteryMode: body.batteryMode, batterySoc: body.battery.soc };
     },
     async setChargeMode() {
+      if (dryRun) {
+        console.log("dry-run: would set charge mode");
+        return;
+      }
       await request("POST", "/batterymode/charge");
     },
     async setNormalMode() {
+      if (dryRun) {
+        console.log("dry-run: would set normal mode");
+        return;
+      }
       await request("POST", "/batterymode/normal");
     },
   };

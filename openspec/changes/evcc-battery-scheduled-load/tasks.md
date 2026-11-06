@@ -50,7 +50,7 @@
 
 ### 2.I Dry-run mode
 
-- [ ] 2.15 scheduled-battery-grid-charge: "Given dry-run mode is enabled" / "Then the intended charge mode change is logged" / "And no POST or DELETE request is sent to evcc" — red → green → commit
+- [x] 2.15 scheduled-battery-grid-charge: "Given dry-run mode is enabled" / "Then the intended charge mode change is logged" / "And no POST or DELETE request is sent to evcc" — red → green → commit
 
 ### 2.J Winter cheap-tariff schedule
 

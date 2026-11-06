@@ -73,3 +73,85 @@ test("setChargeMode posts charge mode with the API key as bearer token", async (
     "Bearer evcc_secret",
   );
 });
+
+test("dry-run getState still reads state from evcc", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const client = createEvccClient({
+    baseUrl: "http://evcc.local:7070",
+    apiKey: "evcc_secret",
+    timeoutMs: 5000,
+    dryRun: true,
+    fetch: fakeFetch(calls, { batteryMode: "normal", battery: { soc: 40 } }),
+  });
+
+  const state = await client.getState();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(state.batterySoc, 40);
+});
+
+test("dry-run setChargeMode sends no request", async (t) => {
+  t.mock.method(console, "log", () => {});
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const client = createEvccClient({
+    baseUrl: "http://evcc.local:7070",
+    apiKey: "evcc_secret",
+    timeoutMs: 5000,
+    dryRun: true,
+    fetch: fakeFetch(calls),
+  });
+
+  await client.setChargeMode();
+
+  assert.equal(calls.length, 0);
+});
+
+test("dry-run setChargeMode logs the intended charge mode change without the API key", async (t) => {
+  const log = t.mock.method(console, "log", () => {});
+  const client = createEvccClient({
+    baseUrl: "http://evcc.local:7070",
+    apiKey: "evcc_secret",
+    timeoutMs: 5000,
+    dryRun: true,
+    fetch: fakeFetch([]),
+  });
+
+  await client.setChargeMode();
+
+  const lines = log.mock.calls.map((c) => String(c.arguments[0]));
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0], "dry-run: would set charge mode");
+  assert.ok(!lines[0].includes("evcc_secret"));
+});
+
+test("dry-run setNormalMode sends no request", async (t) => {
+  t.mock.method(console, "log", () => {});
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const client = createEvccClient({
+    baseUrl: "http://evcc.local:7070",
+    apiKey: "evcc_secret",
+    timeoutMs: 5000,
+    dryRun: true,
+    fetch: fakeFetch(calls),
+  });
+
+  await client.setNormalMode();
+
+  assert.equal(calls.length, 0);
+});
+
+test("dry-run setNormalMode logs the intended normal mode change", async (t) => {
+  const log = t.mock.method(console, "log", () => {});
+  const client = createEvccClient({
+    baseUrl: "http://evcc.local:7070",
+    apiKey: "evcc_secret",
+    timeoutMs: 5000,
+    dryRun: true,
+    fetch: fakeFetch([]),
+  });
+
+  await client.setNormalMode();
+
+  assert.deepEqual(log.mock.calls.map((c) => c.arguments[0]), ["dry-run: would set normal mode"]);
+});
