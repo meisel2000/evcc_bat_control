@@ -86,15 +86,23 @@ Given('the battery state of charge is {int} percent', function (percent) {
   this.evcc.setBatterySoc(percent);
 });
 
-const SCHEDULED_RUN_OBSERVE_MS = 5 * 1000;
+// Closed local port: nothing listens here, so connecting to evcc is refused.
+const UNREACHABLE_EVCC_URL = 'http://127.0.0.1:1';
+
+const SCHEDULED_RUN_OBSERVE_MS = 15 * 1000;
 const SCHEDULED_RUN_POLL_MS = 50;
 
+Given('evcc cannot be reached', function () {
+  this.evccUrl = UNREACHABLE_EVCC_URL;
+});
+
 // The app keeps re-sending charge mode until stopped. Start it, wait until it
-// either exits on its own (e.g. battery already at target) or has sent a
-// charge request / the observation window elapses, then SIGTERM it if still
-// running and record the result.
-When('the scheduled run starts', async function () {
-  const { child, result } = await startApp(this.evcc.url, { targetSoc: this.targetSoc });
+// either exits on its own (e.g. battery already at target, or evcc unreachable)
+// or has sent a charge request / the observation window elapses, then SIGTERM
+// it if still running and record the result.
+When('the scheduled run starts', { timeout: SCHEDULED_RUN_OBSERVE_MS + 15 * 1000 }, async function () {
+  const evccUrl = this.evccUrl ?? this.evcc.url;
+  const { child, result } = await startApp(evccUrl, { targetSoc: this.targetSoc });
   const isRunning = () => child.exitCode === null && child.signalCode === null;
   const chargeSent = () =>
     this.evcc.requests.some((r) => r.method === 'POST' && r.path === '/batterymode/charge');
@@ -202,6 +210,24 @@ When('the job receives a termination signal', { timeout: TERMINATION_CHARGE_WAIT
   }
   this.run = await result;
   this.terminationExited = exited;
+});
+
+Then('an error is logged', function () {
+  const output = `${this.run.stderr}\n${this.run.stdout}`;
+  assert.match(
+    output,
+    /error/i,
+    `expected app to log an error, got stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()}`,
+  );
+});
+
+Then('the run exits with a non-zero exit code', function () {
+  assert.notEqual(
+    this.run.exitCode,
+    0,
+    `expected app to exit with a non-zero exit code, got ${this.run.exitCode} ` +
+      `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+  );
 });
 
 Then('the battery is set to normal mode', function () {
