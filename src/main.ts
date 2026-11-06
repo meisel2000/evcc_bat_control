@@ -43,13 +43,49 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
     apiKey: cfg.apiKey,
     timeoutMs: cfg.httpTimeoutMs,
   });
+  const clockOpts = testClockOptions(env);
+  if (clockOpts === null) {
+    console.error("config error: EVCC_TEST_CLOCK must be an ISO-8601 time");
+    return EXIT_CONFIG_ERROR;
+  }
   try {
-    await runScheduledCharge({ targetSoc: cfg.targetSoc }, client);
+    const result = await runScheduledCharge(
+      { targetSoc: cfg.targetSoc, maxDurationMinutes: cfg.maxDurationMinutes },
+      client,
+      clockOpts,
+    );
+    if (result.outcome === "max-duration-reached") {
+      console.error(
+        `error: charge did not reach target ${cfg.targetSoc}% within ${cfg.maxDurationMinutes} minutes`,
+      );
+      return 1;
+    }
   } catch (err) {
     console.error(`error: ${(err as Error).message}`);
     return 1;
   }
   return 0;
+}
+
+/**
+ * Test-only seam. When EVCC_TEST_CLOCK is set to an ISO-8601 time, the job uses a
+ * virtual clock that starts there, and each sleep advances it instantly.
+ * Returns undefined (real clock and real sleep) when unset, or null when invalid.
+ */
+function testClockOptions(
+  env: Record<string, string | undefined>,
+): { now: () => number; sleep: (ms: number) => Promise<void> } | undefined | null {
+  const start = env.EVCC_TEST_CLOCK;
+  if (start === undefined) return undefined;
+  const startMs = Date.parse(start);
+  if (Number.isNaN(startMs)) return null;
+  let virtualNow = startMs;
+  return {
+    now: () => virtualNow,
+    sleep: async (ms: number) => {
+      virtualNow += ms;
+    },
+  };
 }
 
 main(process.argv, process.env).then((code) => {

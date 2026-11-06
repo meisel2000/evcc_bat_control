@@ -18,6 +18,47 @@ Given('the battery is charging from the grid', function () {
   this.evcc.setBatterySoc(40);
 });
 
+Given('the maximum duration is {int} hours', function (hours) {
+  this.maxDurationMinutes = hours * 60;
+});
+
+// Virtual clock start for time-based stops (see design: injectable clock).
+const TEST_CLOCK_START = '2026-01-10T02:00:00Z';
+const MAX_DURATION_EXIT_TIMEOUT_MS = 30 * 1000;
+
+When('the charge has run for {int} hours without reaching the target', { timeout: MAX_DURATION_EXIT_TIMEOUT_MS + 15 * 1000 }, async function (hours) {
+  const settings = { targetSoc: this.targetSoc };
+  if (this.maxDurationMinutes !== undefined) {
+    settings.maxDurationMinutes = this.maxDurationMinutes;
+  }
+  const { child, result } = await startApp(this.evcc.url, settings, {
+    env: { EVCC_TEST_CLOCK: TEST_CLOCK_START },
+  });
+  const deadline = Date.now() + MAX_DURATION_EXIT_TIMEOUT_MS;
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+    await sleep(50);
+  }
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGTERM');
+    this.run = await result;
+    assert.fail(
+      `expected app to stop after ${hours} hours of charging within ` +
+        `${MAX_DURATION_EXIT_TIMEOUT_MS / 1000} s, but it kept running ` +
+        `(stdout: ${this.run.stdout.trim()}, stderr: ${this.run.stderr.trim()})`,
+    );
+  }
+  this.run = await result;
+});
+
+Then('the run exits with an error', function () {
+  assert.notEqual(
+    this.run.exitCode,
+    0,
+    `expected app to exit with an error, got exit code ${this.run.exitCode} ` +
+      `(stdout: ${this.run.stdout.trim()})`,
+  );
+});
+
 When('90 seconds have passed', { timeout: CHARGE_WINDOW_TIMEOUT_MS }, async function () {
   const { child, result } = await startApp(this.evcc.url, { targetSoc: this.targetSoc });
   await sleep(CHARGE_WINDOW_MS);

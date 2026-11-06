@@ -14,14 +14,15 @@ const TEST_API_KEY = 'evcc_test_key_for_acceptance';
 
 // Starts the app without waiting for it to exit. Returns the child process
 // (so a step can observe it or stop it) and a promise for the final result.
-async function startApp(evccUrl, settings = {}) {
+// `options.env` adds environment variables for the child (e.g. EVCC_TEST_CLOCK).
+async function startApp(evccUrl, settings = {}, options = {}) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'evcc-accept-'));
   const configPath = path.join(dir, 'config.json');
   const config = { evccUrl, targetSoc: 90, ...settings };
   await writeFile(configPath, JSON.stringify(config));
 
   const child = spawn(process.execPath, [APP_ENTRY, configPath], {
-    env: { ...process.env, EVCC_API_KEY: TEST_API_KEY },
+    env: { ...process.env, EVCC_API_KEY: TEST_API_KEY, ...(options.env || {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -35,8 +36,8 @@ async function startApp(evccUrl, settings = {}) {
   return { child, result };
 }
 
-async function runApp(evccUrl, settings = {}) {
-  const { result } = await startApp(evccUrl, settings);
+async function runApp(evccUrl, settings = {}, options = {}) {
+  const { result } = await startApp(evccUrl, settings, options);
   return result;
 }
 
