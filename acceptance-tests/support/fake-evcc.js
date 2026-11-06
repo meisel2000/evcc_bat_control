@@ -34,6 +34,10 @@ class FakeEvcc {
     this.requests = [];
   }
 
+  setBatterySoc(soc) {
+    this.state.battery = { ...this.state.battery, soc };
+  }
+
   handle(req, res) {
     let body = '';
     req.on('data', (chunk) => (body += chunk));

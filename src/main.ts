@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { loadConfig, ConfigError } from "./config.ts";
+import { createEvccClient } from "./evcc-client.ts";
+import { runScheduledCharge } from "./scheduled-charge.ts";
 
 const EXIT_CONFIG_ERROR = 2;
 
@@ -36,6 +38,17 @@ async function main(argv: string[], env: Record<string, string | undefined>): Pr
       `noProgressTimeoutMinutes=${cfg.noProgressTimeoutMinutes} ` +
       `httpTimeoutMs=${cfg.httpTimeoutMs} dryRun=${cfg.dryRun}`,
   );
+  const client = createEvccClient({
+    baseUrl: cfg.evccUrl,
+    apiKey: cfg.apiKey,
+    timeoutMs: cfg.httpTimeoutMs,
+  });
+  try {
+    await runScheduledCharge({ targetSoc: cfg.targetSoc }, client);
+  } catch (err) {
+    console.error(`error: ${(err as Error).message}`);
+    return 1;
+  }
   return 0;
 }
 
